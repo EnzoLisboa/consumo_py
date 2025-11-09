@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -71,6 +72,7 @@ def read_measurements(
     voltage_column: Optional[str],
     current_column: Optional[str],
     time_format: Optional[str],
+    power_scale: float,
 ) -> List[Measurement]:
     """Lê o arquivo CSV e retorna as amostras ordenadas por tempo."""
 
@@ -83,6 +85,9 @@ def read_measurements(
         )
 
     measurements: List[Measurement] = []
+
+    skipped_missing_values = 0
+    skipped_invalid_values = 0
 
     with csv_path.open("r", newline="", encoding="utf-8-sig") as csv_file:
         reader = csv.DictReader(csv_file, delimiter=delimiter)
@@ -97,18 +102,63 @@ def read_measurements(
             )
 
         for row in reader:
-            timestamp = parse_timestamp(row[time_column], time_format)
+            time_value = row.get(time_column, "")
+            if not time_value or not time_value.strip():
+                skipped_missing_values += 1
+                continue
+
+            try:
+                timestamp = parse_timestamp(time_value, time_format)
+            except ValueError:
+                skipped_invalid_values += 1
+                continue
 
             if power_column:
-                power = parse_float(row[power_column], power_column)
+                power_value = row.get(power_column, "")
+                if not power_value or not power_value.strip():
+                    skipped_missing_values += 1
+                    continue
+
+                try:
+                    power = parse_float(power_value, power_column) * power_scale
+                except ValueError:
+                    skipped_invalid_values += 1
+                    continue
             else:
-                voltage = parse_float(row[voltage_column], voltage_column)
-                current = parse_float(row[current_column], current_column)
-                power = voltage * current
+                voltage_value = row.get(voltage_column, "")
+                current_value = row.get(current_column, "")
+                if not voltage_value or not voltage_value.strip():
+                    skipped_missing_values += 1
+                    continue
+                if not current_value or not current_value.strip():
+                    skipped_missing_values += 1
+                    continue
+
+                try:
+                    voltage = parse_float(voltage_value, voltage_column)
+                    current = parse_float(current_value, current_column)
+                except ValueError:
+                    skipped_invalid_values += 1
+                    continue
+
+                power = voltage * current * power_scale
 
             measurements.append(Measurement(timestamp=timestamp, power_w=power))
 
     measurements.sort(key=lambda measurement: measurement.timestamp)
+
+    if skipped_missing_values or skipped_invalid_values:
+        messages = []
+        if skipped_missing_values:
+            messages.append(
+                f"{skipped_missing_values} linha(s) ignorada(s) por valores ausentes"
+            )
+        if skipped_invalid_values:
+            messages.append(
+                f"{skipped_invalid_values} linha(s) ignorada(s) por valores inválidos"
+            )
+        print("Aviso: " + "; ".join(messages) + ".", file=sys.stderr)
+
     return measurements
 
 
@@ -155,6 +205,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Nome da coluna que contém a potência em watts. Informe vazio para usar tensão e corrente.",
     )
     parser.add_argument(
+        "--power-scale",
+        type=float,
+        default=1.0,
+        help=(
+            "Fator multiplicativo aplicado à coluna de potência (ou ao produto tensão×corrente). "
+            "Útil para converter porcentagens em watts."
+        ),
+    )
+    parser.add_argument(
         "--voltage-column",
         default="",
         help="Nome da coluna com a tensão em volts (usado quando não há coluna de potência).",
@@ -191,6 +250,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         voltage_column=voltage_column,
         current_column=current_column,
         time_format=args.time_format,
+        power_scale=args.power_scale,
     )
 
     if len(measurements) < 2:
