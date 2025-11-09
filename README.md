@@ -16,28 +16,51 @@ source .venv/bin/activate  # Linux/macOS
 
 ## Uso
 
-O script é executado a partir da linha de comando. Passe o caminho do arquivo CSV e informe como as colunas estão organizadas.
+### 1. Prepare os arquivos
 
-Os arquivos CSV podem ser organizados na pasta `dados/`, já criada no projeto para facilitar o armazenamento dos insumos.
+Coloque os CSVs de medições em qualquer pasta do seu computador (a pasta `dados/`
+do repositório é apenas uma sugestão). Cada linha deve conter um timestamp e o
+valor de potência medido — ou, alternativamente, tensão e corrente.
+
+### 2. Execute o comando básico
+
+Abra um terminal na pasta onde está `consumo.py` e rode:
 
 ```bash
-python consumo.py mediacoes.csv \
-    --delimiter ';' \
-    --time-column timestamp \
-    --power-column potencia
+python consumo.py CAMINHO/DO/ARQUIVO.csv \
+    --time-column Timestamp \
+    --power-column Power_W
 ```
 
-Quando os dados trazem a potência em outra unidade (por exemplo, porcentagem),
-use `--power-scale` para converter o valor para watts. O comando abaixo lê um
-arquivo cujo timestamp está na coluna `Timestamp_PC` e cuja potência está em
-`Lamp_Power_Percent`, assumindo que 100% corresponde a 80 W:
+Substitua `CAMINHO/DO/ARQUIVO.csv` pelo arquivo (ou pasta) que você quer
+analisar e ajuste os nomes das colunas de acordo com o seu CSV. Para processar
+toda uma pasta de arquivos CSV, passe o diretório em vez de um arquivo único:
 
 ```bash
-python consumo.py dados/log_controle_2025-09-08_08-01-38.csv \
+python consumo.py dados/
+```
+
+### 3. Converta porcentagens para watts (ex.: sistema de 60 W)
+
+Se o seu equipamento registra a potência em porcentagem, informe o fator de
+escala com `--power-scale`. Para um sistema cujo valor de 100% equivale a 60 W
+(como no seu caso), use `0.6`:
+
+```bash
+python consumo.py dados/medicoes.csv \
     --time-column Timestamp_PC \
     --power-column Lamp_Power_Percent \
-    --power-scale 0.8
+    --power-scale 0.6
 ```
+
+O argumento multiplica cada leitura pela constante informada (por exemplo,
+50% × 0.6 = 30 W).
+
+### 4. Leia o relatório
+
+O programa imprime um resumo com o intervalo das medições, o número de amostras
+válidas e o consumo estimado em Wh/kWh. Se mais de um arquivo for processado, um
+resumo consolidado com todos os arquivos também é exibido.
 
 ### Colunas aceitas
 
