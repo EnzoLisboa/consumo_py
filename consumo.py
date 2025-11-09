@@ -52,6 +52,13 @@ class Report:
         return self.energy_wh_without_control / 1000.0
 
     @property
+    def energy_saving_percent(self) -> Optional[float]:
+        if self.energy_wh_without_control <= 0:
+            return None
+        saving = self.energy_wh_without_control - self.energy_wh_with_control
+        return 100.0 * (saving / self.energy_wh_without_control)
+
+    @property
     def start(self) -> Optional[datetime]:
         return self.samples[0].timestamp if self.samples else None
 
@@ -261,6 +268,10 @@ def print_report(report: Report) -> None:
         "  Sem controle de potência: "
         f"{report.energy_kw_per_hour_without_control:.4f} kW/h"
     )
+    if report.energy_saving_percent is None:
+        print("  Economia estimada: N/D")
+    else:
+        print(f"  Economia estimada: {report.energy_saving_percent:.2f} %")
     print("".rstrip())
 
 
@@ -307,6 +318,17 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             "    Sem controle de potência: "
             f"{total_wh_without_control/1000.0:.4f} kW/h"
         )
+        if total_wh_without_control <= 0:
+            print("    Economia estimada: N/D")
+        else:
+            saving_percent = (
+                100.0
+                * (
+                    (total_wh_without_control - total_wh_with_control)
+                    / total_wh_without_control
+                )
+            )
+            print(f"    Economia estimada: {saving_percent:.2f} %")
 
 
 if __name__ == "__main__":
