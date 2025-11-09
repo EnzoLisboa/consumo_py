@@ -27,11 +27,26 @@ python consumo.py mediacoes.csv \
     --power-column potencia
 ```
 
+Quando os dados trazem a potência em outra unidade (por exemplo, porcentagem),
+use `--power-scale` para converter o valor para watts. O comando abaixo lê um
+arquivo cujo timestamp está na coluna `Timestamp_PC` e cuja potência está em
+`Lamp_Power_Percent`, assumindo que 100% corresponde a 80 W:
+
+```bash
+python consumo.py dados/log_controle_2025-09-08_08-01-38.csv \
+    --time-column Timestamp_PC \
+    --power-column Lamp_Power_Percent \
+    --power-scale 0.8
+```
+
 ### Colunas aceitas
 
 - `--time-column`: coluna com o instante de cada medição. Por padrão espera-se `timestamp` em formato ISO 8601.
-- `--power-column`: coluna com valores de potência (em watts). Informe uma string vazia (`""`) para usá-la em conjunto com tensão e corrente.
+- `--power-column`: coluna com valores de potência. Informe uma string vazia (`""`) para usá-la em conjunto com tensão e corrente.
 - `--voltage-column` e `--current-column`: nomes das colunas com tensão (V) e corrente (A), respectivamente. São usadas apenas quando não há coluna de potência.
+- `--power-scale`: fator multiplicativo aplicado à coluna de potência (ou ao
+  produto tensão × corrente). Útil quando a medição é fornecida em porcentagem
+  ou em outra escala.
 - `--time-format`: permite especificar explicitamente o formato do horário usando diretivas `strftime` (ex.: `%d/%m/%Y %H:%M`).
 
 ### Saída
