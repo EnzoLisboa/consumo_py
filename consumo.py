@@ -2,7 +2,7 @@
 
 O script percorre um ou mais arquivos (ou diretórios contendo CSVs) e
 integra a potência registrada ao longo do tempo para estimar o consumo em
-Watt-hora (Wh) e quilowatt-hora (kWh).
+quilowatt por hora (kW/h).
 
 Execute ``python consumo.py --help`` para detalhes de uso.
 """
@@ -34,6 +34,10 @@ class Report:
 
     @property
     def energy_kwh(self) -> float:
+        return self.energy_wh / 1000.0
+
+    @property
+    def energy_kw_per_hour(self) -> float:
         return self.energy_wh / 1000.0
 
     @property
@@ -217,8 +221,7 @@ def print_report(report: Report) -> None:
     print(f"  Amostras válidas: {len(report.samples)}")
     print("")
     print("Consumo estimado:")
-    print(f"  {report.energy_wh:.2f} Wh")
-    print(f"  {report.energy_kwh:.4f} kWh")
+    print(f"  {report.energy_kw_per_hour:.4f} kW/h")
     print("".rstrip())
 
 
@@ -252,8 +255,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         else:
             print("  Intervalo: N/D")
         print("  Consumo total:")
-        print(f"    {total_wh:.2f} Wh")
-        print(f"    {total_wh/1000.0:.4f} kWh")
+        print(f"    {total_wh/1000.0:.4f} kW/h")
 
 
 if __name__ == "__main__":

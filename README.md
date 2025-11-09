@@ -55,7 +55,7 @@ Se precisar alterar esse valor, edite a constante `SYSTEM_TOTAL_POWER_WATTS` em
 ### 4. Leia o relatório
 
 O programa imprime um resumo com o intervalo das medições, o número de amostras
-válidas e o consumo estimado em Wh/kWh. Se mais de um arquivo for processado, um
+válidas e o consumo estimado em kW/h. Se mais de um arquivo for processado, um
 resumo consolidado com todos os arquivos também é exibido.
 
 ### Colunas aceitas
@@ -66,7 +66,7 @@ resumo consolidado com todos os arquivos também é exibido.
 
 ### Saída
 
-Após processar o CSV, o programa imprime um resumo com o período das medições, quantidade de amostras e o consumo total estimado em watt-hora (Wh) e quilowatt-hora (kWh).
+Após processar o CSV, o programa imprime um resumo com o período das medições, quantidade de amostras e o consumo total estimado em quilowatt por hora (kW/h).
 
 Exemplo de saída:
 
@@ -78,8 +78,7 @@ Resumo das medições:
   Amostras: 96
 
 Consumo estimado:
-  12450.00 Wh
-  12.4500 kWh
+  12.4500 kW/h
 ```
 
 ## Funcionamento interno
@@ -89,7 +88,7 @@ Consumo estimado:
 3. **Cálculo da potência:** a coluna percentual é convertida em watts usando a
    constante `SYSTEM_TOTAL_POWER_WATTS` (por padrão, 60 W).
 4. **Integração trapezoidal:** as amostras são ordenadas cronologicamente e é aplicado o método dos trapézios para integrar a potência em relação ao tempo, resultando em watt-hora.
-5. **Relatório:** ao final, o programa informa o consumo total em Wh e kWh, além de um resumo das medições analisadas.
+5. **Relatório:** ao final, o programa informa o consumo total em kW/h, além de um resumo das medições analisadas.
 
 ## Testes
 
