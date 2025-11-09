@@ -172,12 +172,11 @@ def integrate_energy(samples: Sequence[Sample]) -> float:
     if len(samples) < 2:
         return 0.0
     energy_ws = 0.0
-    for previous, current in zip(samples, samples[1:]):
-        delta_seconds = (current.timestamp - previous.timestamp).total_seconds()
+    for current, nxt in zip(samples, samples[1:]):
+        delta_seconds = (nxt.timestamp - current.timestamp).total_seconds()
         if delta_seconds <= 0:
             continue
-        average_power = (previous.power_watts + current.power_watts) / 2.0
-        energy_ws += average_power * delta_seconds
+        energy_ws += current.power_watts * delta_seconds
     return energy_ws / 3600.0
 
 
