@@ -23,22 +23,33 @@ SYSTEM_TOTAL_POWER_WATTS = 60.0
 @dataclass
 class Sample:
     timestamp: datetime
+    power_percent: float
     power_watts: float
+    power_watts_without_control: float
 
 
 @dataclass
 class Report:
     path: Path
     samples: List[Sample]
-    energy_wh: float
+    energy_wh_with_control: float
+    energy_wh_without_control: float
+
+    @property
+    def energy_wh(self) -> float:
+        return self.energy_wh_with_control
 
     @property
     def energy_kwh(self) -> float:
-        return self.energy_wh / 1000.0
+        return self.energy_wh_with_control / 1000.0
 
     @property
     def energy_kw_per_hour(self) -> float:
-        return self.energy_wh / 1000.0
+        return self.energy_wh_with_control / 1000.0
+
+    @property
+    def energy_kw_per_hour_without_control(self) -> float:
+        return self.energy_wh_without_control / 1000.0
 
     @property
     def start(self) -> Optional[datetime]:
@@ -160,24 +171,41 @@ def load_samples(
             if percent_value is None:
                 continue
 
-            power_value = (percent_value / 100.0) * SYSTEM_TOTAL_POWER_WATTS
+            bounded_percent = max(percent_value, 0.0)
+            power_value = (bounded_percent / 100.0) * SYSTEM_TOTAL_POWER_WATTS
 
-            samples.append(Sample(timestamp=timestamp, power_watts=power_value))
+            percent_without_control = 100.0 if bounded_percent > 0.0 else 0.0
+            power_without_control = (
+                percent_without_control / 100.0 * SYSTEM_TOTAL_POWER_WATTS
+            )
+
+            samples.append(
+                Sample(
+                    timestamp=timestamp,
+                    power_percent=bounded_percent,
+                    power_watts=power_value,
+                    power_watts_without_control=power_without_control,
+                )
+            )
 
     samples.sort(key=lambda sample: sample.timestamp)
     return samples
 
 
-def integrate_energy(samples: Sequence[Sample]) -> float:
+def integrate_energy(samples: Sequence[Sample]) -> tuple[float, float]:
     if len(samples) < 2:
-        return 0.0
-    energy_ws = 0.0
+        return 0.0, 0.0
+    energy_ws_with_control = 0.0
+    energy_ws_without_control = 0.0
     for current, nxt in zip(samples, samples[1:]):
         delta_seconds = (nxt.timestamp - current.timestamp).total_seconds()
         if delta_seconds <= 0:
             continue
-        energy_ws += current.power_watts * delta_seconds
-    return energy_ws / 3600.0
+        energy_ws_with_control += current.power_watts * delta_seconds
+        energy_ws_without_control += (
+            current.power_watts_without_control * delta_seconds
+        )
+    return energy_ws_with_control / 3600.0, energy_ws_without_control / 3600.0
 
 
 def analyze_file(path: Path, args: argparse.Namespace) -> Report:
@@ -188,8 +216,13 @@ def analyze_file(path: Path, args: argparse.Namespace) -> Report:
         time_format=args.time_format,
         percent_column=args.percent_column,
     )
-    energy_wh = integrate_energy(samples)
-    return Report(path=path, samples=list(samples), energy_wh=energy_wh)
+    energy_with_control, energy_without_control = integrate_energy(samples)
+    return Report(
+        path=path,
+        samples=list(samples),
+        energy_wh_with_control=energy_with_control,
+        energy_wh_without_control=energy_without_control,
+    )
 
 
 def iter_csv_files(paths: Iterable[Path]) -> Iterator[Path]:
@@ -220,7 +253,14 @@ def print_report(report: Report) -> None:
     print(f"  Amostras válidas: {len(report.samples)}")
     print("")
     print("Consumo estimado:")
-    print(f"  {report.energy_kw_per_hour:.4f} kW/h")
+    print(
+        "  Com controle de potência: "
+        f"{report.energy_kw_per_hour:.4f} kW/h"
+    )
+    print(
+        "  Sem controle de potência: "
+        f"{report.energy_kw_per_hour_without_control:.4f} kW/h"
+    )
     print("".rstrip())
 
 
@@ -239,7 +279,12 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         print_report(report)
 
     if len(reports) > 1:
-        total_wh = sum(report.energy_wh for report in reports)
+        total_wh_with_control = sum(
+            report.energy_wh_with_control for report in reports
+        )
+        total_wh_without_control = sum(
+            report.energy_wh_without_control for report in reports
+        )
         total_samples = sum(len(report.samples) for report in reports)
         overall_start = min((r.start for r in reports if r.start), default=None)
         overall_end = max((r.end for r in reports if r.end), default=None)
@@ -254,7 +299,14 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         else:
             print("  Intervalo: N/D")
         print("  Consumo total:")
-        print(f"    {total_wh/1000.0:.4f} kW/h")
+        print(
+            "    Com controle de potência: "
+            f"{total_wh_with_control/1000.0:.4f} kW/h"
+        )
+        print(
+            "    Sem controle de potência: "
+            f"{total_wh_without_control/1000.0:.4f} kW/h"
+        )
 
 
 if __name__ == "__main__":
