@@ -14,7 +14,10 @@ import csv
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Iterable, Iterator, List, Optional, Sequence
+
+
+SYSTEM_TOTAL_POWER_WATTS = 60.0
 
 
 @dataclass
@@ -65,8 +68,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--time-column",
-        default="timestamp",
-        help="Nome da coluna contendo os instantes de medição (padrão: 'timestamp').",
+        default="Timestamp_PC",
+        help=(
+            "Nome da coluna contendo os instantes de medição "
+            "(padrão: 'Timestamp_PC')."
+        ),
     )
     parser.add_argument(
         "--time-format",
@@ -77,30 +83,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--power-column",
-        default="power",
+        "--percent-column",
+        default="Lamp_Power_Percent",
         help=(
-            "Coluna com valores de potência. Informe string vazia quando "
-            "usar tensão e corrente."
-        ),
-    )
-    parser.add_argument(
-        "--voltage-column",
-        default=None,
-        help="Coluna com os valores de tensão (em volts).",
-    )
-    parser.add_argument(
-        "--current-column",
-        default=None,
-        help="Coluna com os valores de corrente (em ampères).",
-    )
-    parser.add_argument(
-        "--power-scale",
-        type=float,
-        default=1.0,
-        help=(
-            "Fator multiplicativo aplicado à potência. Útil para converter "
-            "porcentagens em watts."
+            "Coluna contendo a potência relativa da lâmpada em porcentagem "
+            "(padrão: 'Lamp_Power_Percent')."
         ),
     )
     return parser.parse_args(argv)
@@ -144,10 +131,7 @@ def load_samples(
     delimiter: str,
     time_column: str,
     time_format: Optional[str],
-    power_column: Optional[str],
-    voltage_column: Optional[str],
-    current_column: Optional[str],
-    power_scale: float,
+    percent_column: str,
 ) -> List[Sample]:
     samples: List[Sample] = []
     with path.open("r", encoding="utf-8", newline="") as handle:
@@ -157,28 +141,10 @@ def load_samples(
             raise ValueError(
                 f"Coluna de tempo '{time_column}' não encontrada em {path.name}."
             )
-
-        use_power_column = bool(power_column)
-        if use_power_column and power_column not in headers:
+        if percent_column not in headers:
             raise ValueError(
-                f"Coluna de potência '{power_column}' não encontrada em {path.name}."
+                f"Coluna de porcentagem '{percent_column}' não encontrada em {path.name}."
             )
-        if not use_power_column:
-            if not voltage_column or not current_column:
-                raise ValueError(
-                    "Informe --voltage-column e --current-column quando não houver "
-                    "coluna de potência."
-                )
-            missing: List[str] = [
-                col
-                for col in (voltage_column, current_column)
-                if col not in headers
-            ]
-            if missing:
-                joined = ", ".join(missing)
-                raise ValueError(
-                    f"Colunas ausentes no arquivo {path.name}: {joined}."
-                )
 
         for row in reader:
             raw_time = row.get(time_column, "")
@@ -186,19 +152,13 @@ def load_samples(
             if timestamp is None:
                 continue
 
-            if use_power_column:
-                power_value = parse_float(row.get(power_column or ""))
-            else:
-                voltage = parse_float(row.get(voltage_column or ""))
-                current = parse_float(row.get(current_column or ""))
-                if voltage is None or current is None:
-                    continue
-                power_value = voltage * current
-
-            if power_value is None:
+            percent_value = parse_float(row.get(percent_column))
+            if percent_value is None:
                 continue
 
-            samples.append(Sample(timestamp=timestamp, power_watts=power_value * power_scale))
+            power_value = (percent_value / 100.0) * SYSTEM_TOTAL_POWER_WATTS
+
+            samples.append(Sample(timestamp=timestamp, power_watts=power_value))
 
     samples.sort(key=lambda sample: sample.timestamp)
     return samples
@@ -223,10 +183,7 @@ def analyze_file(path: Path, args: argparse.Namespace) -> Report:
         delimiter=args.delimiter,
         time_column=args.time_column,
         time_format=args.time_format,
-        power_column=args.power_column,
-        voltage_column=args.voltage_column,
-        current_column=args.current_column,
-        power_scale=args.power_scale,
+        percent_column=args.percent_column,
     )
     energy_wh = integrate_energy(samples)
     return Report(path=path, samples=list(samples), energy_wh=energy_wh)
