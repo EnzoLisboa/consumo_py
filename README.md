@@ -19,42 +19,38 @@ source .venv/bin/activate  # Linux/macOS
 ### 1. Prepare os arquivos
 
 Coloque os CSVs de medições em qualquer pasta do seu computador (a pasta `dados/`
-do repositório é apenas uma sugestão). Cada linha deve conter um timestamp e o
-valor de potência medido — ou, alternativamente, tensão e corrente.
+do repositório é apenas uma sugestão). Cada linha deve conter:
+
+- `Timestamp_PC` com o instante da medição (em ISO 8601 ou no formato
+  configurado via `--time-format`).
+- `Lamp_Power_Percent` com o percentual de potência registrado pelo sistema.
 
 ### 2. Execute o comando básico
 
 Abra um terminal na pasta onde está `consumo.py` e rode:
 
 ```bash
-python consumo.py CAMINHO/DO/ARQUIVO.csv \
-    --time-column Timestamp \
-    --power-column Power_W
+python consumo.py CAMINHO/DO/ARQUIVO.csv
 ```
 
 Substitua `CAMINHO/DO/ARQUIVO.csv` pelo arquivo (ou pasta) que você quer
-analisar e ajuste os nomes das colunas de acordo com o seu CSV. Para processar
-toda uma pasta de arquivos CSV, passe o diretório em vez de um arquivo único:
+analisar. Para processar toda uma pasta de arquivos CSV, passe o diretório em
+vez de um arquivo único:
 
 ```bash
 python consumo.py dados/
 ```
 
-### 3. Converta porcentagens para watts (ex.: sistema de 60 W)
+Por padrão o script espera as colunas `Timestamp_PC` e `Lamp_Power_Percent`.
+Caso os nomes sejam diferentes, ajuste-os com `--time-column` e
+`--percent-column`.
 
-Se o seu equipamento registra a potência em porcentagem, informe o fator de
-escala com `--power-scale`. Para um sistema cujo valor de 100% equivale a 60 W
-(como no seu caso), use `0.6`:
+### 3. Potência total do sistema
 
-```bash
-python consumo.py dados/medicoes.csv \
-    --time-column Timestamp_PC \
-    --power-column Lamp_Power_Percent \
-    --power-scale 0.6
-```
-
-O argumento multiplica cada leitura pela constante informada (por exemplo,
-50% × 0.6 = 30 W).
+O script converte automaticamente o percentual em watts considerando que 100%
+corresponde à potência máxima do sistema definida no código (por padrão, 60 W).
+Se precisar alterar esse valor, edite a constante `SYSTEM_TOTAL_POWER_WATTS` em
+`consumo.py`.
 
 ### 4. Leia o relatório
 
@@ -64,12 +60,8 @@ resumo consolidado com todos os arquivos também é exibido.
 
 ### Colunas aceitas
 
-- `--time-column`: coluna com o instante de cada medição. Por padrão espera-se `timestamp` em formato ISO 8601.
-- `--power-column`: coluna com valores de potência. Informe uma string vazia (`""`) para usá-la em conjunto com tensão e corrente.
-- `--voltage-column` e `--current-column`: nomes das colunas com tensão (V) e corrente (A), respectivamente. São usadas apenas quando não há coluna de potência.
-- `--power-scale`: fator multiplicativo aplicado à coluna de potência (ou ao
-  produto tensão × corrente). Útil quando a medição é fornecida em porcentagem
-  ou em outra escala.
+- `--time-column`: coluna com o instante de cada medição. Por padrão espera-se `Timestamp_PC` em formato ISO 8601.
+- `--percent-column`: coluna com valores percentuais de potência (0 a 100).
 - `--time-format`: permite especificar explicitamente o formato do horário usando diretivas `strftime` (ex.: `%d/%m/%Y %H:%M`).
 
 ### Saída
@@ -94,7 +86,8 @@ Consumo estimado:
 
 1. **Leitura do CSV:** o arquivo é percorrido usando `csv.DictReader`. O script valida se as colunas informadas existem e converte os valores numéricos para `float`, aceitando vírgulas como separador decimal.
 2. **Conversão de timestamps:** os horários são convertidos para `datetime`. Se `--time-format` não for informado, o valor é interpretado automaticamente no formato ISO 8601.
-3. **Cálculo da potência:** se a coluna de potência for fornecida, ela é utilizada diretamente. Caso contrário, a potência é calculada multiplicando tensão por corrente.
+3. **Cálculo da potência:** a coluna percentual é convertida em watts usando a
+   constante `SYSTEM_TOTAL_POWER_WATTS` (por padrão, 60 W).
 4. **Integração trapezoidal:** as amostras são ordenadas cronologicamente e é aplicado o método dos trapézios para integrar a potência em relação ao tempo, resultando em watt-hora.
 5. **Relatório:** ao final, o programa informa o consumo total em Wh e kWh, além de um resumo das medições analisadas.
 
