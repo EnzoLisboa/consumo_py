@@ -18,6 +18,8 @@ source .venv/bin/activate  # Linux/macOS
 
 O script é executado a partir da linha de comando. Passe o caminho do arquivo CSV e informe como as colunas estão organizadas.
 
+Os arquivos CSV podem ser organizados na pasta `dados/`, já criada no projeto para facilitar o armazenamento dos insumos.
+
 ```bash
 python consumo.py mediacoes.csv \
     --delimiter ';' \
